@@ -72,7 +72,7 @@ def build_cmd_str(cmd, args=None):
         args = '%'.join(map(str, args))
     else:
         args = ''
-    return bytes("@{cmd}%{args}$!".format(cmd=cmd, args=args),'ascii')
+    return "@{cmd}%{args}$!".format(cmd=cmd, args=args).encode()
 
 
 def find_port(baud, timeout):
