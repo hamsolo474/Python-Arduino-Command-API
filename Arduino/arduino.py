@@ -16,7 +16,6 @@ else:
 
 log = logging.getLogger(__name__)
 
-
 def enumerate_serial_ports():
     """
     Uses the Win32 registry to return a iterator of serial
@@ -35,6 +34,28 @@ def enumerate_serial_ports():
         except EnvironmentError:
             break
 
+def rd(sr):
+    """
+    Serial read
+    -------------
+    reads line from serial, removes carriage returns and newlines
+    """
+    t=sr.readline().replace("\r\n", "")
+    #t=self.sr.readline().decode().replace("\r\n", "")
+    return t
+
+def waf(sr, data):
+    """
+    Writes and flushes
+    -------------
+    inputs:
+        data : cmd_string
+    """
+    try:
+        sr.write(data)
+        sr.flush()
+    except:
+        pass
 
 def build_cmd_str(cmd, args=None):
     """
@@ -51,7 +72,7 @@ def build_cmd_str(cmd, args=None):
         args = '%'.join(map(str, args))
     else:
         args = ''
-    return "@{cmd}%{args}$!".format(cmd=cmd, args=args)
+    return bytes("@{cmd}%{args}$!".format(cmd=cmd, args=args),'ascii')
 
 
 def find_port(baud, timeout):
@@ -73,7 +94,7 @@ def find_port(baud, timeout):
             log.debug(str(e))
             continue
         time.sleep(2)
-        version = get_version(sr)
+        version = get_version(self.sr)
         if version != 'version':
             log.debug('Bad version {0}. This is not a Shrimp/Arduino!'.format(
                 version))
@@ -92,7 +113,8 @@ def get_version(sr):
         sr.flush()
     except Exception:
         return None
-    return sr.readline().replace("\r\n", "")
+    return rd(sr)
+    #return sr.readline().decode().replace("\r\n", "")
 
 
 class Arduino(object):
@@ -114,7 +136,6 @@ class Arduino(object):
         self.SoftwareSerial = SoftwareSerial(self)
         self.Servos = Servos(self)
         self.EEPROM = EEPROM(self)
-
     def version(self):
         return get_version(self.sr)
 
@@ -132,11 +153,7 @@ class Arduino(object):
         else:
             pin_ = pin
         cmd_str = build_cmd_str("dw", (pin_,))
-        try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
+        waf(self.sr,cmd_str)
 
     def analogWrite(self, pin, val):
         """
@@ -152,11 +169,7 @@ class Arduino(object):
         elif val < 0:
             val = 0
         cmd_str = build_cmd_str("aw", (pin, val))
-        try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
+        waf(self.sr,cmd_str)
 
     def analogRead(self, pin):
         """
@@ -168,14 +181,9 @@ class Arduino(object):
            value: integer from 1 to 1023
         """
         cmd_str = build_cmd_str("ar", (pin,))
+        waf(self.sr,cmd_str)
         try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
-        rd = self.sr.readline().decode().replace("\r\n", "")
-        try:
-            return int(rd)
+            return int(rd(self.sr))
         except:
             return 0
 
@@ -191,11 +199,7 @@ class Arduino(object):
         else:
             pin_ = pin
         cmd_str = build_cmd_str("pm", (pin_,))
-        try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
+        waf(self.sr,cmd_str)
 
     def pulseIn(self, pin, val):
         """
@@ -211,14 +215,9 @@ class Arduino(object):
         else:
             pin_ = pin
         cmd_str = build_cmd_str("pi", (pin_,))
+        waf(self.sr,cmd_str)
         try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
-        rd = self.sr.readline().decode().replace("\r\n", "")
-        try:
-            return float(rd)
+            return float(rd(self.sr))
         except:
             return -1
 
@@ -258,15 +257,11 @@ class Arduino(object):
         cmd_str = build_cmd_str("ps", (pin_,))
         durations = []
         for s in range(numTrials):
-            try:
-                self.sr.write(cmd_str)
-                self.sr.flush()
-            except:
-                pass
-            rd = self.sr.readline().decode().replace("\r\n", "")
-            if rd.isdigit():
-                if (int(rd) > 1):
-                    durations.append(int(rd))
+            waf(self.sr,cmd_str)
+            RD=rd(self.sr)
+            if RD.isdigit():
+                if (int(RD) > 1):
+                    durations.append(int(RD))
         if len(durations) > 0:
             duration = int(sum(durations)) / int(len(durations))
         else:
@@ -292,14 +287,9 @@ class Arduino(object):
            value: 0 for "LOW", 1 for "HIGH"
         """
         cmd_str = build_cmd_str("dr", (pin,))
+        waf(self.sr,cmd_str)
         try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
-        rd = self.sr.readline().decode().replace("\r\n", "")
-        try:
-            return int(rd)
+            return int(rd(self.sr))
         except:
             return 0
 
@@ -342,17 +332,9 @@ class Arduino(object):
                 cmd_args.extend([durations[duration]
                                 for duration in range(len(durations))])
                 cmd_str = build_cmd_str("to", cmd_args)
-                try:
-                    self.sr.write(cmd_str)
-                    self.sr.flush()
-                except:
-                    pass
+                waf(self.sr,cmd_str)
                 cmd_str = build_cmd_str("nto", [pin])
-                try:
-                    self.sr.write(cmd_str)
-                    self.sr.flush()
-                except:
-                    pass
+                waf(self.sr,cmd_str)
             else:
                 return -1
         else:
@@ -373,9 +355,9 @@ class Arduino(object):
         '''
         cmd_str = build_cmd_str("cap", (pin,))
         self.sr.write(cmd_str)
-        rd = self.sr.readline().decode().replace("\r\n", "")
-        if rd.isdigit():
-            return int(rd)
+        RD = rd(self.sr)
+        if RD.isdigit():
+            return int(RD)
 
     def shiftOut(self, dataPin, clockPin, pinOrder, value):
         """
@@ -389,8 +371,7 @@ class Arduino(object):
         """
         cmd_str = build_cmd_str("so",
                                (dataPin, clockPin, pinOrder, value))
-        self.sr.write(cmd_str)
-        self.sr.flush()
+        waf(self.sr,cmd_str)
 
     def shiftIn(self, dataPin, clockPin, pinOrder):
         """
@@ -404,11 +385,10 @@ class Arduino(object):
             (int) an integer from 0 to 255
         """
         cmd_str = build_cmd_str("si", (dataPin, clockPin, pinOrder))
-        self.sr.write(cmd_str)
-        self.sr.flush()
-        rd = self.sr.readline().decode().replace("\r\n", "")
-        if rd.isdigit():
-            return int(rd)
+        waf(self.sr,cmd_str)
+        RD = rd(self.sr)
+        if RD.isdigit():
+            return int(RD)
 
 
 class Shrimp(Arduino):
@@ -444,55 +424,39 @@ class Servos(object):
         cmd_str = build_cmd_str("sva", (pin, min, max))
 
         while True:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-
-            rd = self.sr.readline().decode().replace("\r\n", "")
+            waf(self.sr,cmd_str)
             if rd:
                 break
             else:
                 log.debug("trying to attach servo to pin {0}".format(pin))
-        position = int(rd)
+        position = int(rd(self.sr))
         self.servo_pos[pin] = position
         return 1
 
     def detach(self, pin):
         position = self.servo_pos[pin]
         cmd_str = build_cmd_str("svd", (position,))
-        try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
+        waf(self.sr,cmd_str)
         del self.servo_pos[pin]
 
     def write(self, pin, angle):
         position = self.servo_pos[pin]
         cmd_str = build_cmd_str("svw", (position, angle))
-
-        self.sr.write(cmd_str)
-        self.sr.flush()
+        waf(self.sr,cmd_str)
 
     def writeMicroseconds(self, pin, uS):
         position = self.servo_pos[pin]
         cmd_str = build_cmd_str("svwm", (position, uS))
-
-        self.sr.write(cmd_str)
-        self.sr.flush()
+        waf(self.sr,cmd_str)
 
     def read(self, pin):
         if pin not in self.servo_pos.keys():
             self.attach(pin)
         position = self.servo_pos[pin]
         cmd_str = build_cmd_str("svr", (position,))
+        waf(self.sr,cmd_str)
         try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
-        rd = self.sr.readline().decode().replace("\r\n", "")
-        try:
-            angle = int(rd)
+            angle = int(rd(self.sr))
             return angle
         except:
             return None
@@ -505,7 +469,7 @@ class SoftwareSerial(object):
     """
 
     def __init__(self, board):
-        self.board = board
+        self.boadd = board
         self.sr = board.sr
         self.connected = False
 
@@ -515,12 +479,8 @@ class SoftwareSerial(object):
         specified tx,rx pins, at specified baud
         """
         cmd_str = build_cmd_str("ss", (p1, p2, baud))
-        try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
-        response = self.sr.readline().replace("\r\n", "")
+        waf(self.sr,cmd_str)
+        response = rd()
         if response == "ss OK":
             self.connected = True
             return True
@@ -535,12 +495,8 @@ class SoftwareSerial(object):
         """
         if self.connected:
             cmd_str = build_cmd_str("sw", (data,))
-            try:
-                self.sr.write(cmd_str)
-                self.sr.flush()
-            except:
-                pass
-            response = self.sr.readline().replace("\r\n", "")
+            waf(self.sr,cmd_str)
+            response = rd()
             if response == "ss OK":
                 return True
         else:
@@ -553,9 +509,7 @@ class SoftwareSerial(object):
         """
         if self.connected:
             cmd_str = build_cmd_str("sr")
-            self.sr.write(cmd_str)
-            self.sr.flush()
-            response = self.sr.readline().replace("\r\n", "")
+            response = rd()
             if response:
                 return response
         else:
@@ -578,9 +532,8 @@ class EEPROM(object):
         cmd_str = build_cmd_str("sz")
    
         try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-            response = self.sr.readline().replace("\r\n", "")
+            waf(self.sr,cmd_str)
+            response = rd()
             return int(response)
         except:
             return 0
@@ -597,22 +550,17 @@ class EEPROM(object):
         elif value < 0:
             value = 0
         cmd_str = build_cmd_str("eewr", (address, value))
-        try:
-            self.sr.write(cmd_str)
-            self.sr.flush()
-        except:
-            pass
+        waf(self.sr,cmd_str)
     
-    def read(self, adrress):
+    def read(self, address):
         """ Reads a byte from the EEPROM.
         
         :address: the location to write to, starting from 0 (int)
         """
-        cmd_str = build_cmd_str("eer", (adrress,))
+        cmd_str = build_cmd_str("eer", (address,))
         try:
-            self.sr.write(cmd_str)
-            self.sr.flush()            
-            response = self.sr.readline().replace("\r\n", "")
+            waf(self.sr,cmd_str)
+            response = rd(self.sr)
             if response:
                 return int(response)
         except:
