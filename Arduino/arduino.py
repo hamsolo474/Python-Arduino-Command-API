@@ -469,7 +469,7 @@ class SoftwareSerial(object):
     """
 
     def __init__(self, board):
-        self.boadd = board
+        self.board = board
         self.sr = board.sr
         self.connected = False
 
@@ -480,7 +480,7 @@ class SoftwareSerial(object):
         """
         cmd_str = build_cmd_str("ss", (p1, p2, baud))
         waf(self.sr,cmd_str)
-        response = rd()
+        response = rd(self.sr)
         if response == "ss OK":
             self.connected = True
             return True
@@ -496,7 +496,7 @@ class SoftwareSerial(object):
         if self.connected:
             cmd_str = build_cmd_str("sw", (data,))
             waf(self.sr,cmd_str)
-            response = rd()
+            response = rd(self.sr)
             if response == "ss OK":
                 return True
         else:
@@ -509,7 +509,7 @@ class SoftwareSerial(object):
         """
         if self.connected:
             cmd_str = build_cmd_str("sr")
-            response = rd()
+            response = rd(self.sr)
             if response:
                 return response
         else:
@@ -533,7 +533,7 @@ class EEPROM(object):
    
         try:
             waf(self.sr,cmd_str)
-            response = rd()
+            response = rd(self.sr)
             return int(response)
         except:
             return 0
