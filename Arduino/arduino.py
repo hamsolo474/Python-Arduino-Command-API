@@ -114,8 +114,6 @@ def get_version(sr):
     except Exception:
         return None
     return rd(sr)
-    #return sr.readline().decode().replace("\r\n", "")
-
 
 class Arduino(object):
 
@@ -136,6 +134,9 @@ class Arduino(object):
         self.SoftwareSerial = SoftwareSerial(self)
         self.Servos = Servos(self)
         self.EEPROM = EEPROM(self)
+        # initialises 999 pins to avoid a thousand lines of try and except statements
+        # @TODO put checks in a function maybe? or set the board so it grabs the number of pins for better checking? it could even distinguish between analog and digital pins for better errors
+        self.pinModeDic = {i:'' for i in range(999)}
     def version(self):
         return get_version(self.sr)
 
@@ -148,12 +149,19 @@ class Arduino(object):
            pin : digital pin number
            val : either "HIGH" or "LOW"
         """
-        if val == "LOW":
-            pin_ = -pin
+        valid = ('HIGH','LOW')
+        if not self.pinModeDic[pin] == 'OUTPUT':
+            raise ValueError('pin: {} not set to OUTPUT'.format(pin))
+        else
+        if val.upper() in valid:
+            if val.upper() == "LOW":
+                pin_ = -pin
+            else:
+                pin_ = pin
+            cmd_str = build_cmd_str("dw", (pin_,))
+            waf(self.sr,cmd_str)
         else:
-            pin_ = pin
-        cmd_str = build_cmd_str("dw", (pin_,))
-        waf(self.sr,cmd_str)
+            raise ValueError('val: {} not in {}'.format(str(val).upper(), str(valid)))
 
     def analogWrite(self, pin, val):
         """
@@ -164,12 +172,16 @@ class Arduino(object):
            pin : pin number
            val : integer 0 (off) to 255 (always on)
         """
-        if val > 255:
-            val = 255
-        elif val < 0:
-            val = 0
-        cmd_str = build_cmd_str("aw", (pin, val))
-        waf(self.sr,cmd_str)
+        if not self.pinModeDic[pin] == 'OUTPUT':
+            raise ValueError('pin: {} not set to OUTPUT'.format(pin))
+        else:
+            if int(val) > 255:
+                val = 255
+            elif int(val) < 0:
+                val = 0
+            cmd_str = build_cmd_str("aw", (pin, val))
+            waf(self.sr,cmd_str)
+
 
     def analogRead(self, pin):
         """
@@ -180,12 +192,15 @@ class Arduino(object):
         returns:
            value: integer from 1 to 1023
         """
-        cmd_str = build_cmd_str("ar", (pin,))
-        waf(self.sr,cmd_str)
-        try:
-            return int(rd(self.sr))
-        except:
-            return 0
+        if not self.pinModeDic[pin] == 'INPUT':
+            raise ValueError('pin: {} not set to INPUT'.format(pin))
+        else:
+            cmd_str = build_cmd_str("ar", (pin,))
+            waf(self.sr,cmd_str)
+            try:
+                return int(rd(self.sr))
+            except:
+                return 0
 
     def pinMode(self, pin, val):
         """
@@ -193,13 +208,19 @@ class Arduino(object):
         inputs:
            pin: pin number to toggle
            val: "INPUT" or "OUTPUT"
+        @TODO implement INPUT_PULLUP
         """
-        if val == "INPUT":
-            pin_ = -pin
+        valid= ('INPUT', 'OUTPUT', 'INPUT_PULLUP')
+        if val.upper() in valid:
+            if val.upper() == "INPUT":
+                pin_ = -pin
+            else:
+                pin_ = pin
+            self.pinModeDic[pin] = val.upper()
+            cmd_str = build_cmd_str("pm", (pin_,))
+            waf(self.sr,cmd_str)
         else:
-            pin_ = pin
-        cmd_str = build_cmd_str("pm", (pin_,))
-        waf(self.sr,cmd_str)
+            raise ValueError('val: {} not in {}'.format(str(val).upper(), str(valid)))
 
     def pulseIn(self, pin, val):
         """
@@ -210,16 +231,22 @@ class Arduino(object):
         returns:
            duration : pulse length measurement
         """
-        if val == "LOW":
-            pin_ = -pin
+        valid = ('LOW', 'HIGH')
+        if not self.pinModeDic[pin] == 'INPUT':
+            raise ValueError('pin: {} not set to INPUT'.format(pin))
+        if not val.upper() in valid:
+            raise ValueError('val: {} not in {}'.format(str(val).upper(), str(valid)))
         else:
-            pin_ = pin
-        cmd_str = build_cmd_str("pi", (pin_,))
-        waf(self.sr,cmd_str)
-        try:
-            return float(rd(self.sr))
-        except:
-            return -1
+            if val == "LOW":
+                pin_ = -pin
+            else:
+                pin_ = pin
+            cmd_str = build_cmd_str("pi", (pin_,))
+            waf(self.sr,cmd_str)
+            try:
+                return float(rd(self.sr))
+            except:
+                return -1
 
     def pulseIn_set(self, pin, val, numTrials=5):
         """
@@ -250,27 +277,28 @@ class Arduino(object):
         pinMode(pin, INPUT);
         long duration = pulseIn(pin, HIGH);
         """
-        if val == "LOW":
-            pin_ = -pin
-        else:
-            pin_ = pin
-        cmd_str = build_cmd_str("ps", (pin_,))
-        durations = []
-        for s in range(numTrials):
-            waf(self.sr,cmd_str)
-            RD=rd(self.sr)
-            if RD.isdigit():
-                if (int(RD) > 1):
-                    durations.append(int(RD))
-        if len(durations) > 0:
-            duration = int(sum(durations)) / int(len(durations))
-        else:
-            duration = None
+        if not self.pinModeDic[pin] == 'OUTPUT':
+            if val == "LOW":
+                pin_ = -pin
+            else:
+                pin_ = pin
+            cmd_str = build_cmd_str("ps", (pin_,))
+            durations = []
+            for s in range(numTrials):
+                waf(self.sr,cmd_str)
+                RD=rd(self.sr)
+                if RD.isdigit():
+                    if (int(RD) > 1):
+                        durations.append(int(RD))
+            if len(durations) > 0:
+                duration = int(sum(durations)) / int(len(durations))
+            else:
+                duration = None
 
-        try:
-            return float(duration)
-        except:
-            return -1
+            try:
+                return float(duration)
+            except:
+                return -1
 
     def close(self):
         if self.sr.isOpen():
@@ -286,12 +314,15 @@ class Arduino(object):
         returns:
            value: 0 for "LOW", 1 for "HIGH"
         """
-        cmd_str = build_cmd_str("dr", (pin,))
-        waf(self.sr,cmd_str)
-        try:
-            return int(rd(self.sr))
-        except:
-            return 0
+        if not self.pinModeDic[pin] == 'INPUT':
+            raise ValueError('pin: {} not set to INPUT'.format(pin))
+        else:
+            cmd_str = build_cmd_str("dr", (pin,))
+            waf(self.sr,cmd_str)
+            try:
+                return int(rd(self.sr))
+            except:
+                return 0
 
     def Melody(self, pin, melody, durations):
         """
@@ -309,36 +340,39 @@ class Arduino(object):
                                                 [4,8,8,4,4,4,4,4])
         Playing short melodies (1 or 2 tones) didn't cause
         trouble during testing
-        """
-        NOTES = dict(
-            B0=31, C1=33, CS1=35, D1=37, DS1=39, E1=41, F1=44, FS1=46, G1=49,
-            GS1=52, A1=55, AS1=58, B1=62, C2=65, CS2=69, D2=73, DS2=78, E2=82,
-            F2=87, FS2=93, G2=98, GS2=104, A2=110, AS2=117, B2=123, C3=131,
-            CS3=139, D3=147, DS3=156, E3=165, F3=175, FS3=185, G3=196, GS3=208,
-            A3=220, AS3=233, B3=247, C4=262, CS4=277, D4=294, DS4=311, E4=330,
-            F4=349, FS4=370, G4=392, GS4=415, A4=440,
-            AS4=466, B4=494, C5=523, CS5=554, D5=587, DS5=622, E5=659, F5=698,
-            FS5=740, G5=784, GS5=831, A5=880, AS5=932, B5=988, C6=1047,
-            CS6=1109, D6=1175, DS6=1245, E6=1319, F6=1397, FS6=1480, G6=1568,
-            GS6=1661, A6=1760, AS6=1865, B6=1976, C7=2093, CS7=2217, D7=2349,
-            DS7=2489, E7=2637, F7=2794, FS7=2960, G7=3136, GS7=3322, A7=3520,
-            AS7=3729, B7=3951, C8=4186, CS8=4435, D8=4699, DS8=4978)
-        if (isinstance(melody, list)) and (isinstance(durations, list)):
-            length = len(melody)
-            cmd_args = [length, pin]
-            if length == len(durations):
-                cmd_args.extend([NOTES.get(melody[note])
-                                for note in range(length)])
-                cmd_args.extend([durations[duration]
-                                for duration in range(len(durations))])
-                cmd_str = build_cmd_str("to", cmd_args)
-                waf(self.sr,cmd_str)
-                cmd_str = build_cmd_str("nto", [pin])
-                waf(self.sr,cmd_str)
+       """
+        if not self.pinModeDic[pin] == 'OUTPUT':
+                raise ValueError('pin: {} not initialised to OUTPUT'.format(pin))
+        else:
+            NOTES = dict(
+                B0=31, C1=33, CS1=35, D1=37, DS1=39, E1=41, F1=44, FS1=46, G1=49,
+                GS1=52, A1=55, AS1=58, B1=62, C2=65, CS2=69, D2=73, DS2=78, E2=82,
+                F2=87, FS2=93, G2=98, GS2=104, A2=110, AS2=117, B2=123, C3=131,
+                CS3=139, D3=147, DS3=156, E3=165, F3=175, FS3=185, G3=196, GS3=208,
+                A3=220, AS3=233, B3=247, C4=262, CS4=277, D4=294, DS4=311, E4=330,
+                F4=349, FS4=370, G4=392, GS4=415, A4=440,
+                AS4=466, B4=494, C5=523, CS5=554, D5=587, DS5=622, E5=659, F5=698,
+                FS5=740, G5=784, GS5=831, A5=880, AS5=932, B5=988, C6=1047,
+                CS6=1109, D6=1175, DS6=1245, E6=1319, F6=1397, FS6=1480, G6=1568,
+                GS6=1661, A6=1760, AS6=1865, B6=1976, C7=2093, CS7=2217, D7=2349,
+                DS7=2489, E7=2637, F7=2794, FS7=2960, G7=3136, GS7=3322, A7=3520,
+                AS7=3729, B7=3951, C8=4186, CS8=4435, D8=4699, DS8=4978)
+            if (isinstance(melody, list)) and (isinstance(durations, list)):
+                length = len(melody)
+                cmd_args = [length, pin]
+                if length == len(durations):
+                    cmd_args.extend([NOTES.get(melody[note])
+                                    for note in range(length)])
+                    cmd_args.extend([durations[duration]
+                                    for duration in range(len(durations))])
+                    cmd_str = build_cmd_str("to", cmd_args)
+                    waf(self.sr,cmd_str)
+                    cmd_str = build_cmd_str("nto", [pin])
+                    waf(self.sr,cmd_str)
+                else:
+                    return -1
             else:
                 return -1
-        else:
-            return -1
 
     def capacitivePin(self, pin):
         '''
@@ -369,9 +403,22 @@ class Arduino(object):
             pinOrder (String): either 'MSBFIRST' or 'LSBFIRST'
             value (int): an integer from 0 and 255
         """
-        cmd_str = build_cmd_str("so",
-                               (dataPin, clockPin, pinOrder, value))
-        waf(self.sr,cmd_str)
+        valid = ('MSBFIRST', 'LSBFIRST')
+        if self.pinModeDic[dataPin] == 'OUTPUT' and self.pinModeDic[clockPin] == 'OUTPUT' and pinOrder.upper() in valid:
+            if value < 0:
+                value = 0
+            elif value > 255:
+                value = 255
+            cmd_str = build_cmd_str("so",
+                                   (dataPin, clockPin, pinOrder, value))
+            waf(self.sr,cmd_str)
+        else:
+            if not self.pinModeDic[dataPin] == 'OUTPUT':
+                raise ValueError('pin: {} not initialised to OUTPUT'.format(dataPin))
+            if not self.pinModeDic[clockPin] == 'OUTPUT':
+                raise ValueError('pin: {} not initialised to OUTPUT'.format(clockpin))
+            if not pinOrder in valid.upper():
+                raise ValueError('pinOrder: {} not in {}'.format(str(pinOrder).upper(), valid))
 
     def shiftIn(self, dataPin, clockPin, pinOrder):
         """
@@ -384,11 +431,21 @@ class Arduino(object):
         Output:
             (int) an integer from 0 to 255
         """
-        cmd_str = build_cmd_str("si", (dataPin, clockPin, pinOrder))
-        waf(self.sr,cmd_str)
-        RD = rd(self.sr)
-        if RD.isdigit():
-            return int(RD)
+        valid = ('MSBFIRST', 'LSBFIRST')
+        if self.pinModeDic[dataPin] == 'OUTPUT' and self.pinModeDic[clockPin] == 'OUTPUT' and pinOrder.upper() in valid:
+            cmd_str = build_cmd_str("si",
+                                   (dataPin, clockPin, pinOrder))
+            waf(self.sr,cmd_str)
+            RD = rd(self.sr)
+            if RD.isdigit():
+                return int(RD)
+        else:
+            if not self.pinModeDic[dataPin] == 'OUTPUT':
+                raise ValueError('pin: {} not initialised to OUTPUT'.format(dataPin))
+            if not self.pinModeDic[clockPin] == 'OUTPUT':
+                raise ValueError('pin: {} not initialised to OUTPUT'.format(clockpin))
+            if not pinOrder in valid.upper():
+                raise ValueError('pinOrder: {} not in {}'.format(str(pinOrder).upper(), valid))
 
 
 class Shrimp(Arduino):
@@ -409,12 +466,10 @@ class Wires(object):
 
 
 class Servos(object):
-
     """
     Class for Arduino servo support
     0.03 second delay noted
     """
-
     def __init__(self, board):
         self.board = board
         self.sr = board.sr
@@ -422,14 +477,15 @@ class Servos(object):
 
     def attach(self, pin, min=544, max=2400):
         cmd_str = build_cmd_str("sva", (pin, min, max))
-
         while True:
             waf(self.sr,cmd_str)
-            if rd:
+            # @TODO is this broken? yes.
+            RD = rd(self.sr)
+            if RD:
                 break
             else:
                 log.debug("trying to attach servo to pin {0}".format(pin))
-        position = int(rd(self.sr))
+        position = int(RD)
         self.servo_pos[pin] = position
         return 1
 
@@ -463,11 +519,9 @@ class Servos(object):
 
 
 class SoftwareSerial(object):
-
     """
     Class for Arduino software serial functionality
     """
-
     def __init__(self, board):
         self.board = board
         self.sr = board.sr
@@ -520,7 +574,6 @@ class EEPROM(object):
     """
     Class for reading and writing to EEPROM. 
     """
-
     def __init__(self, board):
         self.board = board
         self.sr = board.sr
@@ -544,7 +597,6 @@ class EEPROM(object):
         :address: the location to write to, starting from 0 (int)
         :value: the value to write, from 0 to 255 (byte)
         """
-        
         if value > 255:
             value = 255
         elif value < 0:
@@ -565,4 +617,4 @@ class EEPROM(object):
                 return int(response)
         except:
             return 0
-                                
+

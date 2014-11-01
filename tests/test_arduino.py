@@ -44,6 +44,7 @@ class MockSerial(object):
         self.input.append(str(line) + term)
 
 
+FAIL = "Any old string"
 INPUT = "INPUT"
 OUTPUT = "OUTPUT"
 LOW = "LOW"
@@ -102,52 +103,88 @@ class TestArduino(ArduinoTestCase):
         self.assertEqual(self.mock_serial.output[0],
             build_cmd_str('pm', (pin,)))
 
+    @unittest.expectedFailure
+    def test_pinMode_fail(self):
+        from Arduino.arduino import build_cmd_str
+        pin = 9
+        self.board.pinMode(pin, FAIL)
+        self.assertEqual(self.mock_serial.output[0],
+            build_cmd_str('pm', (pin,)))
+
+    @unittest.expectedFailure
+    def test_pulseIn_failPM(self):
+        from Arduino.arduino import build_cmd_str
+        expected_duration = 230
+        self.mock_serial.push_line(expected_duration)
+        pin = 9
+        self.board.pinMode(pin, FAIL)
+        self.assertEqual(self.board.pulseIn(pin, LOW), expected_duration)
+        self.assertEqual(self.mock_serial.output[1],
+            build_cmd_str('pi', (-pin,)))
+
+    @unittest.expectedFailure
+    def test_pulseIn_failVAL(self):
+        from Arduino.arduino import build_cmd_str
+        expected_duration = 230
+        self.mock_serial.push_line(expected_duration)
+        pin = 9
+        self.board.pinMode(pin, INPUT)
+        self.assertEqual(self.board.pulseIn(pin, FAIL), expected_duration)
+        self.assertEqual(self.mock_serial.output[1],
+            build_cmd_str('pi', (-pin,)))
+
     def test_pulseIn_low(self):
         from Arduino.arduino import build_cmd_str
         expected_duration = 230
         self.mock_serial.push_line(expected_duration)
         pin = 9
+        self.board.pinMode(pin, INPUT)
         self.assertEqual(self.board.pulseIn(pin, LOW), expected_duration)
-        self.assertEqual(self.mock_serial.output[0],
+        self.assertEqual(self.mock_serial.output[1],
             build_cmd_str('pi', (-pin,)))
 
     def test_pulseIn_high(self):
         from Arduino.arduino import build_cmd_str
         expected_duration = 230
         pin = 9
+        self.board.pinMode(pin, INPUT)
         self.mock_serial.push_line(expected_duration)
         self.assertEqual(self.board.pulseIn(pin, HIGH), expected_duration)
-        self.assertEqual(self.mock_serial.output[0], build_cmd_str('pi', (pin,)))
+        self.assertEqual(self.mock_serial.output[1], build_cmd_str('pi', (pin,)))
 
     def test_digitalRead(self):
         from Arduino.arduino import build_cmd_str
         pin = 9
+        self.board.pinMode(pin, INPUT)
         self.mock_serial.push_line(READ_LOW)
         self.assertEqual(self.board.digitalRead(pin), READ_LOW)
-        self.assertEqual(self.mock_serial.output[0], build_cmd_str('dr', (pin,)))
+        self.assertEqual(self.mock_serial.output[1], build_cmd_str('dr', (pin,)))
 
     def test_digitalWrite_low(self):
         from Arduino.arduino import build_cmd_str
         pin = 9
+        self.board.pinMode(pin, OUTPUT)
         self.board.digitalWrite(pin, LOW)
-        self.assertEqual(self.mock_serial.output[0], build_cmd_str('dw', (-pin,)))
+        self.assertEqual(self.mock_serial.output[1], build_cmd_str('dw', (-pin,)))
 
     def test_digitalWrite_high(self):
         from Arduino.arduino import build_cmd_str
         pin = 9
+        self.board.pinMode(pin, OUTPUT)
         self.board.digitalWrite(pin, HIGH)
-        self.assertEqual(self.mock_serial.output[0], build_cmd_str('dw', (pin,)))
+        self.assertEqual(self.mock_serial.output[1], build_cmd_str('dw', (pin,)))
 
     def test_melody(self):
         from Arduino.arduino import build_cmd_str
         pin = 9
+        self.board.pinMode(pin, OUTPUT)
         notes = ["C4"]
         duration = 4
         C4_NOTE = 262
         self.board.Melody(pin, notes, [duration])
-        self.assertEqual(self.mock_serial.output[0],
-            build_cmd_str('to', (len(notes), pin, C4_NOTE, duration)))
         self.assertEqual(self.mock_serial.output[1],
+            build_cmd_str('to', (len(notes), pin, C4_NOTE, duration)))
+        self.assertEqual(self.mock_serial.output[2],
             build_cmd_str('nto', (pin,)))
 
     def test_shiftIn(self):
@@ -155,38 +192,44 @@ class TestArduino(ArduinoTestCase):
         dataPin = 2
         clockPin = 3
         pinOrder = MSBFIRST
+        self.board.pinMode(clockPin, OUTPUT)
+        self.board.pinMode(dataPin, OUTPUT)
         expected = 0xff
         self.mock_serial.push_line(expected)
         self.assertEqual(self.board.shiftIn(dataPin, clockPin, pinOrder),
             expected)
-        self.assertEqual(self.mock_serial.output[0],
+        self.assertEqual(self.mock_serial.output[2],
             build_cmd_str('si', (dataPin, clockPin, pinOrder,)))
 
     def test_shiftOut(self):
         from Arduino.arduino import build_cmd_str
         dataPin = 2
         clockPin = 3
+        self.board.pinMode(clockPin, OUTPUT)
+        self.board.pinMode(dataPin, OUTPUT)
         pinOrder = MSBFIRST
         value = 0xff
         self.board.shiftOut(dataPin, clockPin, pinOrder, value)
-        self.assertEqual(self.mock_serial.output[0],
+        self.assertEqual(self.mock_serial.output[2],
             build_cmd_str('so', (dataPin, clockPin, pinOrder, value)))
 
     def test_analogRead(self):
         from Arduino.arduino import build_cmd_str
         pin = 9
+        self.board.pinMode(pin, INPUT)
         expected = 1023
         self.mock_serial.push_line(expected)
         self.assertEqual(self.board.analogRead(pin), expected)
-        self.assertEqual(self.mock_serial.output[0],
+        self.assertEqual(self.mock_serial.output[1],
             build_cmd_str('ar', (pin,)))
 
     def test_analogWrite(self):
         from Arduino.arduino import build_cmd_str
         pin = 9
+        self.board.pinMode(pin, OUTPUT)
         value = 255
         self.board.analogWrite(pin, value)
-        self.assertEqual(self.mock_serial.output[0],
+        self.assertEqual(self.mock_serial.output[1],
             build_cmd_str('aw', (pin, value)))
 
 
