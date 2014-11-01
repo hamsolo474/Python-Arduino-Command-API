@@ -45,3 +45,7 @@ dist/
 Icon?
 ehthumbs.db
 Thumbs.db
+
+# Other Bullshit     #
+######################
+*.swp

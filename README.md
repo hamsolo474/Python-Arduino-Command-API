@@ -10,7 +10,7 @@ simply read/control/troubleshoot/experiment
 with harware connected to an Arduino board without ever having to recompile and reload sketches to the board itself.
 
 Method names within the Python Arduino Command API are designed to be as close
-as possible to their Arduino programming language counterparts
+as possible to their Arduino programming language counterparts and it even includes error checking.
 
 ## Simple usage example (LED blink)
 ```python
@@ -34,7 +34,7 @@ while True:
 ```
 
 ## Requirements:
-- [Python](http://python.org/) 2.3 or higher (Python 3.x not yet tested, but would probably work)
+- [Python](http://python.org/) These releases are only tested in Python 2.7.8 and Python 3.3 though its worth trying in other languages.
 - [pyserial](http://pyserial.sourceforge.net/) 2.6 or higher
 - Any [Arduino compatible microcontroller](https://www.sparkfun.com/categories/242) with at least 14KB of flash memory
 
@@ -201,4 +201,4 @@ print('EEPROM size {size}'.format(size=board.EEPROM.size()))
 - Include a wizard which generates 'prototype.ino' with selected serial baud rate and Arduino function support
 (to help reduce memory requirements).
 - Multi-serial support for Arduino mega (`Serial1.read()`, etc)
-
+- Implement INPUT_PULLUP
