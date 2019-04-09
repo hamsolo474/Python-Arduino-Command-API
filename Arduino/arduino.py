@@ -152,7 +152,6 @@ class Arduino(object):
         valid = ('HIGH','LOW')
         if not self.pinModeDic[pin] == 'OUTPUT':
             raise ValueError('pin: {} not set to OUTPUT'.format(pin))
-        else
         if val.upper() in valid:
             if val.upper() == "LOW":
                 pin_ = -pin
